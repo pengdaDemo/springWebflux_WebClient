@@ -1,0 +1,50 @@
+buildscript {
+    repositories {
+        mavenLocal()
+        maven { url = 'http://maven.aliyun.com/nexus/content/groups/public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:2.0.7.RELEASE")
+    }
+}
+
+
+ext {
+    springBootVersion = "2.0.7.RELEASE"
+    crawlerVersion = "v4.0.0"
+}
+
+repositories {
+    mavenLocal()
+    maven { url = 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    mavenCentral()
+}
+
+subprojects {
+    group 'com.pd'
+    version '1.0-SNAPSHOT'
+
+    apply plugin: 'java'
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+
+    repositories {
+        mavenLocal()
+        maven { url = 'http://maven.aliyun.com/nexus/content/groups/public/' }
+        mavenCentral()
+    }
+
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    dependencies {
+        testCompile group: 'junit', name: 'junit', version: '4.12'
+        compile "org.springframework.boot:spring-boot-starter-test:$springBootVersion"
+        compile "org.springframework.boot:spring-boot-starter:$springBootVersion"
+        compile "org.springframework.boot:spring-boot-starter-web:$springBootVersion"
+        compile "org.springframework.boot:spring-boot-starter-aop:$springBootVersion"
+    }
+}
+
+

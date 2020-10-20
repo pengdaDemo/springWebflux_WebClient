@@ -1,0 +1,4 @@
+rootProject.name = 'springWebflux_WebClient'
+include 'server'
+include 'client'
+
