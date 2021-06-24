@@ -16,15 +16,13 @@ import org.apache.http.util.EntityUtils;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import javax.servlet.http.HttpServletRequest;
-import java.io.IOException;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.HashMap;
@@ -57,8 +55,44 @@ public class FileController {
 
         return "成功";
     }
-    @PostMapping("/download")
-    public String download(@RequestParam("file") String test) throws Exception{
-        return person2.name;
+    @GetMapping(path = "/download")
+    public HttpServletResponse download(HttpServletResponse response) throws Exception{
+        try {
+            File file = new File("/data/dev/Documents/mongoData.zip");
+            if (file.exists()) {
+                String dfileName = file.getName();
+                InputStream fis = new BufferedInputStream(new FileInputStream(file));
+                response.reset();
+                response.setContentType("application/x-download");
+                response.addHeader("Content-Disposition","attachment;filename="+ new String(dfileName.getBytes(),"iso-8859-1"));
+                response.addHeader("Content-Length", "" + file.length());
+                OutputStream toClient = new BufferedOutputStream(response.getOutputStream());
+                response.setContentType("application/octet-stream");
+                byte[] buffer = new byte[1024 * 1024 * 4]; //使用缓存慢慢读取，支持大文件下载
+                int i = -1;
+                while ((i = fis.read(buffer)) != -1) {
+                    toClient.write(buffer, 0, i);
+                }
+                fis.close();
+                toClient.flush();
+                toClient.close();
+                try {
+                    response.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                PrintWriter out = response.getWriter();
+                out.print("<script>");
+                out.print("alert(\"未找到文件\")");
+                out.print("</script>");
+            }
+        } catch (IOException ex) {
+            PrintWriter out = response.getWriter();
+            out.print("<script>");
+            out.print("alert(\"未找到文件\")");
+            out.print("</script>");
+        }
+        return response;
     }
 }

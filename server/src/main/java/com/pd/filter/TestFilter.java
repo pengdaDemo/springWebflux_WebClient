@@ -15,6 +15,7 @@ public class TestFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+
         System.out.println("11111111111111111111111");
         HttpServletRequest requestHttp = (HttpServletRequest) servletRequest;
         System.out.println(requestHttp.getRequestURL());

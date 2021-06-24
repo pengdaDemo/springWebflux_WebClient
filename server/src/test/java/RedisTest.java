@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit4.SpringRunner;
+import redis.clients.jedis.Transaction;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -45,7 +46,7 @@ public class RedisTest {
     }
     @Test
     public void exireTime() throws Exception{
-
+        Transaction transaction = null;
         String key = "seedUpdateControlCount";
         long nowTime = new Date().getTime() - 86400000;
         for (int i = 0; i < 4000; i++) {
@@ -54,5 +55,21 @@ public class RedisTest {
         }
 
 
+    }
+    @Test
+    public void delete() {
+        stringRedisTemplate.opsForHash().delete("threadPoolMonitor","crawler-server-5bb896dcbc-m65gb");
+    }
+    @Test
+    public void findKey() {
+        System.out.println(stringRedisTemplate.opsForValue().get("SingleNodeComponent_"+"TaskCacheScanner"));
+    }
+
+    /**
+     * 查询crawler任务熔断
+     */
+    @Test
+    public void findBreaker() {
+        System.out.println(stringRedisTemplate.opsForValue().get("seedBreaker"+"491c9fa85e10489993467d35e9c90c87"+"Source"));
     }
 }

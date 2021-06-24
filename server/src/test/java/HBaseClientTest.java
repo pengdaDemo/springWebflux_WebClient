@@ -28,8 +28,14 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -57,6 +63,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.NavigableMap;
+import java.util.Properties;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -72,10 +80,11 @@ public class HBaseClientTest {
 
     private final String MD5_TABLE_NAME = "md5";
 
+    private final String MD5_BAK = "md5_back";
+
     private final String columnFamily = "d";
 
-    @Autowired
-    private HBaseClient hbaseClient;
+    private static HBaseClient hbaseClient = new HBaseClient();;
 
     @Autowired
     private HDfsClient hDfsClient;
@@ -88,9 +97,20 @@ public class HBaseClientTest {
     @Autowired
     private MongoTemplate mongoTemplate;
 
+    private static KafkaProducer<String, String> kafkaProducer = null;
+
     @Before
     public void setUp() throws Exception {
         mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+    }
+    static {
+        Properties p = new Properties();
+        p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "172.16.20.100:6667,172.16.20.101:6667,172.16.20.102:6667");//生产环境kafka地址，多个地址用逗号分割
+        p.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        p.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        p.put("max.block.ms", "5000");
+        p.put("max.request.size", "5242880");
+        kafkaProducer = new KafkaProducer<>(p);
     }
 
     @Test
@@ -258,12 +278,44 @@ public class HBaseClientTest {
         }
     }
 
+
+    @Test
+    public void getHbaseFile() throws Exception{
+        Configuration configuration = HBaseConfiguration.create();
+        configuration.set("hbase.zookeeper.quorum", "ambari01.fydata:2181,ambari02.fydata:2181,ambari03.fydata:2181");
+        String rowKey = DigestUtils.md5Hex("http://static.cninfo.com.cn/finalpage/2020-10-22/1208599796.PDF");
+        try(Connection connection = ConnectionFactory.createConnection(configuration)) {
+            Result result = getRow("md5", rowKey, connection);
+            Cell cell = result.getColumnLatestCell("d".getBytes(), "md5_id".getBytes());
+            if(cell !=null) {
+                String fileMd5 = new String(CellUtil.cloneValue(cell));
+                Result resultFile = getRow("files", fileMd5, connection);
+                Cell fileCell = resultFile.getColumnLatestCell("d".getBytes(), "binaryData".getBytes());
+                if(fileCell != null) {
+                    byte[] data = CellUtil.cloneValue(fileCell);
+                    System.out.println(data.length);
+                }
+                System.out.println(fileMd5);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+    public Result getRow(String tableName, String rowKey, Connection connection) {
+        try (Table table = connection.getTable(TableName.valueOf(tableName))){
+            Get get = new Get(Bytes.toBytes(rowKey));
+            return table.get(get);
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
     @Test
     public void testHbaseData() throws Exception{
         Configuration configuration = HBaseConfiguration.create();
         configuration.set("hbase.zookeeper.quorum", "ambari01.fydata:2181,ambari02.fydata:2181,ambari03.fydata:2181");
         hbaseClient.connection = ConnectionFactory.createConnection(configuration);
-        String rowKey = "5b0bcef1e1fd3f3d26a881fc";
+        String rowKey = "000013865a095121dda1360163cdd7bc";
         //System.out.println(hbaseClient.isTableExist("oldFiles"));
         Result result = hbaseClient.getRow(MD5_TABLE_NAME, rowKey);
         HbaseFileInfo dto = HbaseFileInfo.BinaryToObject(result);
@@ -287,6 +339,52 @@ public class HBaseClientTest {
         }
         System.out.println(result.current().getTimestamp());
     }
+    @Test
+    public void bianli() throws Exception {
+        Configuration configuration = HBaseConfiguration.create();
+        configuration.set("hbase.zookeeper.quorum", "ambari01.fydata:2181,ambari02.fydata:2181,ambari03.fydata:2181");
+        hbaseClient.connection = ConnectionFactory.createConnection(configuration);
+        ResultScanner scanner = hbaseClient.getScanner(MD5_BAK, columnFamily, null);
+        Result[] results = scanner.next(300);
+        int count = 300;
+        chuli(results);
+
+        while ((results=scanner.next(300)) !=null){
+            chuli(results);
+            count+=300;
+            System.out.println("当前遍历数量: " + count);
+        }
+    }
+    public void chuli(Result[] results) throws Exception {
+        for (Result result : results) {
+            HbaseFileInfo dto = HbaseFileInfo.BinaryToObject(result);
+            String rowKey = Bytes.toString(result.getRow());
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("url", dto.getUrl());
+            jsonObject.put("pageUrl", dto.getPageUrl());
+            jsonObject.put("seedId", dto.getSeedId());
+            jsonObject.put("name", dto.getName());
+            if(dto.getUrl()!=null&&dto.getUrl().startsWith("http") && dto.isExist()){
+                ProducerRecord<String, String> record = new ProducerRecord("md5_back", rowKey, jsonObject.toString());
+                Future<RecordMetadata> future = kafkaProducer.send(record);
+                RecordMetadata recordMetadata = future.get();
+                if(!recordMetadata.hasOffset()) {
+                    System.out.println("kafka写入失败, rowKey：" + rowKey);
+                }
+            }
+//            System.out.println("rowKey:  "+Bytes.toString(result.getRow()));
+//            System.out.println("id:  "+dto.getId());
+//            System.out.println("name:  "+dto.getName());
+//            System.out.println(dto.getMd5_id());
+//            System.out.println("url:  "+dto.getUrl());
+//            System.out.println("uri:  "+dto.getUri());
+//            System.out.println("pageUrl:  "+dto.getPageUrl());
+//            System.out.println("seedId:  "+dto.getSeedId());
+//            System.out.println(dto.getType());
+//            System.out.println(dto.getLength());
+//            System.out.println("isExist:  "+ dto.isExist());
+        }
+    }
 
     @Test
     public void qianyi() throws Exception {
@@ -295,7 +393,7 @@ public class HBaseClientTest {
         configuration.set("hbase.client.keyvalue.maxsize", "10485760");
         hbaseClient.connection = ConnectionFactory.createConnection(configuration);
         hDfsClient.fs = HBaseClientTest.getFileSystem();
-        MongoCursor<Document> cursor = mongoTemplate.getCollection("fs.files").find().batchSize(50).iterator();
+        MongoCursor<Document> cursor = mongoTemplate.getCollection("fs.files").find().noCursorTimeout(true).batchSize(300).iterator();
         int count =0;
         String id = "";
         boolean isError = false;
@@ -304,10 +402,10 @@ public class HBaseClientTest {
                 GridFSDownloadStream inputStream = null;
                 ByteArrayOutputStream outputStream = null;
                 try {
-                    count++;//5000000
+                    count++;//3940000
                     Document document = cursor.next();
                     id = document.get("_id").toString();
-                    if(count < 5000000 || hbaseClient.exists(MD5_TABLE_NAME, id)) {
+                    if(count < 780000 || hbaseClient.exists(MD5_TABLE_NAME, id)) {
                         continue;
                     };
                     //System.out.println(document.get("_id").toString());

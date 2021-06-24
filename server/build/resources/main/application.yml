@@ -6,6 +6,13 @@ server:
   tomcat:
     redirect-context-root: false
 spring:
+  data:
+    mongodb:
+      uri: mongodb://scrolls:BALNkBD28x@172.16.40.1:27701,172.16.40.2:27701,172.16.40.3:27701/scrolls
   redis:
-    host: localhost
+    host: 172.16.70.1
     port: 6379
+    password: idc@beehive
+  servlet:
+    multipart:
+      max-file-size: 20000000

@@ -18,9 +18,9 @@ public class Controller {
     @RequestMapping(value ="/test", produces = "text/html; charset=utf-8")
     @MyAnnotation(methodName = "test")
     public String test(@RequestParam String url) throws Exception {
-        if(true) {
-            throw new RuntimeException("1111111111");
-        }
+//        if(true) {
+//            throw new RuntimeException("1111111111");
+//        }
         return url;
     }
     @RequestMapping(value ="/", produces = "text/html; charset=utf-8")

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 //@Slf4j
-@Component
 public class HBaseClient {
 
     public Connection connection;
@@ -206,15 +205,15 @@ public class HBaseClient {
             Scan scan = new Scan();
             scan.setMaxVersions(1);
             scan.addColumn(familyBytes,Bytes.toBytes("id"));
-            scan.addColumn(familyBytes,Bytes.toBytes("type"));
+            scan.addColumn(familyBytes,Bytes.toBytes("url"));
             scan.addColumn(familyBytes,Bytes.toBytes("name"));
             scan.addColumn(familyBytes,Bytes.toBytes("uri"));
             scan.addColumn(familyBytes,Bytes.toBytes("length"));
             scan.addColumn(familyBytes,Bytes.toBytes("clientId"));
-            scan.addColumn(familyBytes,Bytes.toBytes("date"));
+            scan.addColumn(familyBytes,Bytes.toBytes("pageUrl"));
             scan.addColumn(familyBytes,Bytes.toBytes("bucket"));
             scan.addColumn(familyBytes,Bytes.toBytes("exist"));
-            scan.addColumn(familyBytes,Bytes.toBytes("pdfSplit"));
+            scan.addColumn(familyBytes,Bytes.toBytes("seedId"));
             if (null!=filterList){
                 scan.setFilter(filterList);
             }

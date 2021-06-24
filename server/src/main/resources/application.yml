@@ -10,8 +10,9 @@ spring:
     mongodb:
       uri: mongodb://scrolls:BALNkBD28x@172.16.40.1:27701,172.16.40.2:27701,172.16.40.3:27701/scrolls
   redis:
-    host: localhost
-    port: 6379
+    host: 172.16.70.57
+    port: 32401
+    password: redis@idc118
   servlet:
     multipart:
       max-file-size: 20000000
